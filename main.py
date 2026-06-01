@@ -108,7 +108,8 @@ class NURICore:
             return ""
         cmd, lower = command.strip(), command.strip().lower()
         
-        if lower.startswith(("admin:", "user:")):\n            prefix, password = lower.split(":", 1)[0], cmd.split(":", 1)[1].strip()
+        if lower.startswith(("admin:", "user:")):
+            prefix, password = lower.split(":", 1)[0], cmd.split(":", 1)[1].strip()
             if prefix == "admin" and password == os.getenv("ADMIN_PASSWORD", "darling"):
                 self.current_role, self.current_user = "admin", "admin"
                 msg = "Admin sifatida qayta kirdingiz!"
@@ -148,7 +149,8 @@ class NURICore:
         for plugin_name, plugin in self.plugins.items():
             try:
                 if hasattr(plugin, 'can_handle') and plugin.can_handle(lower):
-                    if hasattr(plugin, 'process_command'):\n                        result = plugin.process_command(cmd)
+                    if hasattr(plugin, 'process_command'):
+                        result = plugin.process_command(cmd)
                         if result:
                             mm.save_conversation(self.current_user, cmd, result)
                             await self.speak_and_print(result)
