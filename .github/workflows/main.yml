@@ -10,7 +10,7 @@ jobs:
     runs-on: windows-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - uses: actions/setup-python@v4
       with:
@@ -25,7 +25,7 @@ jobs:
       run: python build_exe.py
     
     - name: Upload Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4  # ← v3 dan v4 ga
       with:
         name: NURI-EXE
         path: dist/NURI.exe
