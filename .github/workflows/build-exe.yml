@@ -10,7 +10,8 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '0 2 * * 0'  # Weekly build on Sunday
-
+permissions:
+  contents: write
 env:
   PYTHON_VERSION: '3.11'
   PYINSTALLER_VERSION: '6.10.0'
