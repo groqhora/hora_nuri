@@ -11,6 +11,9 @@ except ImportError:
 from dotenv import load_dotenv
 load_dotenv()
 
+# NURI yaratuvchisi
+CREATOR = "@cerb_34"
+VERSION = "1.0.0"
 
 class AIEngine:
     def __init__(self):
@@ -64,6 +67,11 @@ class AIEngine:
 
     async def generate_response(self, prompt: str, max_retries: int = 3) -> str:
         """Savollarga javob berish"""
+        
+        # Yaratuvchi haqida soruv
+        if any(word in prompt.lower() for word in ["kim yaratgan", "yaratuvchi", "creator", "author", "kim seni", "nuri kim"]):
+            return f"NURI {CREATOR} tomonidan yaratilgan AI assistant. Version: {VERSION}"
+        
         for attempt in range(max_retries):
             try:
                 engine = self.engines_order[self.current_engine_index] if self.current_engine_index < len(self.engines_order) else None
@@ -123,5 +131,7 @@ class AIEngine:
             "total_engines": 4,
             "groq_keys": len(self.groq_keys),
             "gemini_available": bool(self.gemini_key and GEMINI_AVAILABLE),
-            "current_engine_index": self.current_engine_index
+            "current_engine_index": self.current_engine_index,
+            "creator": CREATOR,
+            "version": VERSION
         }
