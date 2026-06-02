@@ -66,7 +66,7 @@ jobs:
           --collect-all=feedparser `
           --add-data=".env.example;." `
           --distpath=dist `
-          --specpath=build `
+          --specpath=. `
           --noconfirm `
           --noupx `
           -w
