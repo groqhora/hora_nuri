@@ -3,6 +3,10 @@ name: Build NURI EXE
 on:
   push:
     branches: [ main ]
+    paths:
+      - '**.py'
+      - 'requirements.txt'
+      - '.github/workflows/build-exe.yml'
   workflow_dispatch:
 
 jobs:
@@ -10,9 +14,11 @@ jobs:
     runs-on: windows-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
     
-    - uses: actions/setup-python@v4
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
       with:
         python-version: '3.11'
     
@@ -21,12 +27,93 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     
-    - name: Build EXE
-      run: python build_exe.py
+    - name: Build EXE with PyInstaller
+      run: |
+        python -m PyInstaller gui.py `
+          --name=NURI `
+          --onefile `
+          --windowed `
+          --hidden-import=PyQt5 `
+          --hidden-import=aiogram `
+          --hidden-import=aiohttp `
+          --hidden-import=groq `
+          --hidden-import=pydantic `
+          --hidden-import=edge_tts `
+          --hidden-import=yt_dlp `
+          --hidden-import=feedparser `
+          --hidden-import=generativeai `
+          --collect-all=PyQt5 `
+          --collect-all=aiogram `
+          --collect-all=aiohttp `
+          --collect-all=groq `
+          --collect-all=pydantic `
+          --collect-all=edge_tts `
+          --collect-all=yt_dlp `
+          --collect-all=feedparser `
+          --distpath=dist `
+          --specpath=. `
+          -y
     
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4  # ← v3 dan v4 ga
+    - name: Check build output
+      run: |
+        if (Test-Path "dist/NURI.exe") {
+          Write-Host "✅ NURI.exe muvaffaqiyatli yaratildi!"
+          Get-Item "dist/NURI.exe" | Format-List FullName, @{Name="Size (MB)";Expression={[math]::Round($_.Length/1MB, 2)}}
+        } else {
+          Write-Host "❌ EXE yaratilmadi"
+          exit 1
+        }
+    
+    - name: Upload EXE as Artifact
+      if: success()
+      uses: actions/upload-artifact@v4
       with:
         name: NURI-EXE
         path: dist/NURI.exe
         retention-days: 90
+    
+    - name: Create Release
+      if: success()
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/NURI.exe
+        tag_name: v${{ github.run_number }}
+        release_name: NURI EXE v${{ github.run_number }}
+        body: |
+          ## 🎉 NURI Standalone EXE
+          
+          **Yaratuvchi:** @cerb_34
+          
+          Avtomatik build qilingan executable fayl.
+          
+          ### 📥 Yuklab olish
+          Pastda `NURI.exe` ni yuklab oling va ishga tushiring.
+          
+          ### ⚙️ Konfiguratsiya
+          `.env` faylini yarating:
+          ```env
+          ADMIN_PASSWORD=darling
+          GROQ_API_KEY=your_groq_key_here
+          GEMINI_API_KEY=your_gemini_key_here
+          TELEGRAM_BOT_TOKEN=your_telegram_token
+          TELEGRAM_CHAT_ID=your_chat_id
+          ```
+          
+          ### 🚀 Ishga Tushirish
+          ```
+          NURI.exe
+          ```
+          
+          ### ✨ Xususiyatlar
+          - 🤖 Groq + Gemini AI Engine
+          - 🎤 Voice Support (Text-to-Speech)
+          - 💬 Telegram Integration
+          - 🔐 Admin & User Authentication
+          - 📚 Memory System
+          - 🔌 Plugin Support
+          
+          **Parol:** darling (admin)
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
