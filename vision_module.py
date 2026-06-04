@@ -1,5 +1,5 @@
 import os
-import time
+import base64
 
 try:
     import cv2
@@ -9,20 +9,28 @@ except ImportError:
 
 try:
     from groq import Groq
-    import base64
     from dotenv import load_dotenv
     load_dotenv()
-    GROQ_KEY = os.getenv("GROQ_API_KEY_1")
-    groq_client = Groq(api_key=GROQ_KEY)
-    GROQ_AVAILABLE = True
+    GROQ_KEY = os.getenv("GROQ_API_KEY_1") or os.getenv("GROQ_API_KEY")
+    groq_client = Groq(api_key=GROQ_KEY) if GROQ_KEY else None
+    GROQ_AVAILABLE = bool(groq_client)
 except Exception:
     GROQ_AVAILABLE = False
+    groq_client = None
+
+def _get_capture_path():
+    import sys
+    if getattr(sys, 'frozen', False):
+        base = os.path.dirname(sys.executable)
+    else:
+        base = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, "capture.jpg")
 
 def capture_image(save_path: str = None) -> str:
     if not CV2_AVAILABLE:
         return "Kamera moduli hozircha ishlamayapti."
     if save_path is None:
-        save_path = os.path.expanduser("~/nuri/capture.jpg")
+        save_path = _get_capture_path()
     try:
         cap = cv2.VideoCapture(0)
         if not cap.isOpened():
@@ -44,23 +52,13 @@ def analyze_image(image_path: str) -> str:
             image_data = base64.b64encode(f.read()).decode("utf-8")
         response = groq_client.chat.completions.create(
             model="llama-4-scout-17b-16e-instruct",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{image_data}"
-                            }
-                        },
-                        {
-                            "type": "text",
-                            "text": "Bu rasmda nima ko'rinyapti? O'zbek tilida qisqa tavsif ber."
-                        }
-                    ]
-                }
-            ]
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}},
+                    {"type": "text", "text": "Bu rasmda nima ko'rinyapti? O'zbek tilida qisqa tavsif ber."}
+                ]
+            }]
         )
         return response.choices[0].message.content
     except Exception as e:
@@ -77,13 +75,10 @@ def process_vision_command(text: str) -> str:
 
     if "rasm ol" in text_lower or "foto ol" in text_lower:
         return capture_image()
-
     elif "kamera" in text_lower and "ko'r" in text_lower:
         return capture_and_analyze()
-
     elif "nima ko'rinyapti" in text_lower or "atrofni ko'r" in text_lower:
         return capture_and_analyze()
-
     elif "tahlil qil" in text_lower and "rasm" in text_lower:
         parts = text.split("tahlil qil", 1)
         if len(parts) > 1:
