@@ -1,23 +1,20 @@
 import os
+from groq import Groq
+from dotenv import load_dotenv
+
+load_dotenv()
 
 try:
-    from groq import Groq
-    from dotenv import load_dotenv
-    load_dotenv()
-    GROQ_KEY = os.getenv("GROQ_API_KEY_1")
-    groq_client = Groq(api_key=GROQ_KEY)
-    GROQ_AVAILABLE = True
+    GROQ_KEY = os.getenv("GROQ_API_KEY_1") or os.getenv("GROQ_API_KEY")
+    groq_client = Groq(api_key=GROQ_KEY) if GROQ_KEY else None
+    GROQ_AVAILABLE = bool(groq_client)
 except Exception:
     GROQ_AVAILABLE = False
+    groq_client = None
 
-EMOTION_PROMPT = """Sen foydalanuvchi ovozi va matnidan hissiyotni aniqlaydigan mutaxassissan.
-Quyidagi hissiyotlarni aniqla:
-- Xursand, g'amgin, g'azablangan, qo'rqqan, hayron, bezovta, tinch
-
-Foydalanuvchi matnini tahlil qilib:
-1. Asosiy hissiyotni aniqla
-2. Hissiyot darajasini (past/o'rta/yuqori) ko'rsat
-3. NURI qanday munosabat ko'rsatishi kerakligini tavsiya et"""
+EMOTION_PROMPT = """Sen foydalanuvchi matnidan hissiyotni aniqlaydigan mutaxassissan.
+Quyidagi hissiyotlardan birini aniqla: Xursand, g'amgin, g'azablangan, qo'rqqan, hayron, bezovta, tinch.
+Qisqa javob ber."""
 
 def detect_emotion(text: str) -> dict:
     if not GROQ_AVAILABLE:
@@ -27,10 +24,7 @@ def detect_emotion(text: str) -> dict:
             model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": EMOTION_PROMPT},
-                {
-                    "role": "user",
-                    "content": f"Quyidagi matndan hissiyotni aniqla:\n{text}"
-                }
+                {"role": "user", "content": f"Matndan hissiyotni aniqla:\n{text}"}
             ],
             max_tokens=200
         )
@@ -45,18 +39,10 @@ def adapt_response(text: str, response: str) -> str:
     try:
         emotion_data = detect_emotion(text)
         emotion = emotion_data.get("emotion", "")
-
-        prompt = f"""Foydalanuvchi hissiyoti: {emotion}
-Asl javob: {response}
-
-Javobni foydalanuvchi hissiyotiga mos ravishda qayta yoz.
-Qisqa va tabiiy bo'lsin."""
-
+        prompt = f"Foydalanuvchi hissiyoti: {emotion}\nAsl javob: {response}\nJavobni hissiyotga mos qayta yoz. Qisqa bo'lsin."
         adapted = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
+            messages=[{"role": "user", "content": prompt}],
             max_tokens=500
         )
         return adapted.choices[0].message.content
@@ -79,10 +65,5 @@ def get_emotion_response(emotion: str) -> str:
     return ""
 
 def process_emotion_command(text: str) -> str:
-    text_lower = text.lower()
-
-    if "hissiyot" in text_lower and "aniqla" in text_lower:
-        result = detect_emotion(text)
-        return f"Hissiyot: {result.get('emotion', 'noaniq')}"
-
-    return detect_emotion(text).get("emotion", "Hissiyot aniqlanmadi.")
+    result = detect_emotion(text)
+    return f"Hissiyot: {result.get('emotion', 'noaniq')}"
