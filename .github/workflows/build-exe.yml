@@ -44,7 +44,6 @@ jobs:
           --name=NURI `
           --onefile `
           --windowed `
-          --icon=nuri.ico `
           --hidden-import=PyQt5.QtCore `
           --hidden-import=PyQt5.QtGui `
           --hidden-import=PyQt5.QtWidgets `
