@@ -1,13 +1,20 @@
 import sqlite3
 import os
+import sys
 
-DB_PATH = os.path.expanduser("~/nuri/nuri.db")
+def _get_db_path():
+    if getattr(sys, 'frozen', False):
+        base = os.path.dirname(sys.executable)
+    else:
+        base = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, "nuri.db")
+
+DB_PATH = _get_db_path()
 
 def _get_conn():
     return sqlite3.connect(DB_PATH)
 
 def init_db():
-    """SQLite jadvallarini yaratish"""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     with _get_conn() as conn:
         conn.execute("""
@@ -29,7 +36,6 @@ def init_db():
     print("[NURI.MEMORY] SQLite xotira bazasi yuklandi ✅")
 
 def save_conversation(username: str, user_msg: str, ai_msg: str):
-    """Suhbatni saqlash"""
     if not user_msg or not ai_msg:
         return
     try:
@@ -43,7 +49,6 @@ def save_conversation(username: str, user_msg: str, ai_msg: str):
         print(f"[NURI.MEMORY] Saqlash xatosi: {e}")
 
 def get_history(username: str, limit: int = 5) -> str:
-    """Oxirgi N ta suhbatni kontekst sifatida qaytarish"""
     try:
         with _get_conn() as conn:
             cursor = conn.execute(
@@ -51,22 +56,18 @@ def get_history(username: str, limit: int = 5) -> str:
                 (username or "user", limit)
             )
             rows = cursor.fetchall()
-
         if not rows:
             return ""
-
         rows.reverse()
         history = "Oldingi muloqot:\n"
         for u, a in rows:
             history += f"Foydalanuvchi: {u}\nNURI: {a}\n"
         return history
-
     except Exception as e:
         print(f"[NURI.MEMORY] Tarix xatosi: {e}")
         return ""
 
 def save_setting(key: str, value: str):
-    """Sozlamani saqlash"""
     try:
         with _get_conn() as conn:
             conn.execute(
@@ -78,7 +79,6 @@ def save_setting(key: str, value: str):
         print(f"[NURI.MEMORY] Sozlama xatosi: {e}")
 
 def get_setting(key: str, default: str = "") -> str:
-    """Sozlamani olish"""
     try:
         with _get_conn() as conn:
             cursor = conn.execute(
@@ -90,7 +90,6 @@ def get_setting(key: str, default: str = "") -> str:
         return default
 
 def clear_memory(username: str = None) -> str:
-    """Xotirani tozalash"""
     try:
         with _get_conn() as conn:
             if username:
