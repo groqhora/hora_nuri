@@ -1,22 +1,20 @@
 import sys
 import os
 import asyncio
-import threading
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QTextEdit, QFrame
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QObject
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QTextCursor
 from dotenv import load_dotenv
 load_dotenv()
 
 
 class NuriLoader(QThread):
-    """NURICore ni alohida threadda yuklaydigan sinf"""
-    finished   = pyqtSignal(object)   # nuri_core
-    error      = pyqtSignal(str)
+    finished = pyqtSignal(object)
+    error    = pyqtSignal(str)
 
     def run(self):
         try:
@@ -58,7 +56,6 @@ class NuriGUI(QMainWindow):
         self.worker        = None
         self.authenticated = False
         self.loader        = None
-
         self.setup_ui()
         self.setup_style()
         self.start_loading()
@@ -89,7 +86,6 @@ class NuriGUI(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Header
         header = QFrame()
         header.setObjectName("header")
         header.setFixedHeight(60)
@@ -123,7 +119,6 @@ class NuriGUI(QMainWindow):
         sep.setObjectName("separator")
         main_layout.addWidget(sep)
 
-        # Chat
         self.chat_area = QTextEdit()
         self.chat_area.setReadOnly(True)
         self.chat_area.setObjectName("chatArea")
@@ -134,7 +129,6 @@ class NuriGUI(QMainWindow):
         sep2.setObjectName("separator")
         main_layout.addWidget(sep2)
 
-        # Footer
         footer = QFrame()
         footer.setObjectName("footer")
         footer.setFixedHeight(64)
@@ -163,7 +157,6 @@ class NuriGUI(QMainWindow):
         f_layout.addWidget(self.send_btn)
 
         main_layout.addWidget(footer)
-
         self.add_message("NURI", "Assalomu alaykum! Tizim yuklanmoqda...", "nuri")
 
     def setup_style(self):
@@ -184,9 +177,8 @@ class NuriGUI(QMainWindow):
             QTextEdit#chatArea { background-color: #1a1a2e; border: none;
                                  padding: 16px; font-size: 13px; color: #e0e0e0; }
             QLineEdit#inputField { background-color: #1a1a2e;
-                                   border: 1px solid #0f3460;
-                                   border-radius: 8px; padding: 8px 14px;
-                                   color: #e0e0e0; font-size: 13px; }
+                                   border: 1px solid #0f3460; border-radius: 8px;
+                                   padding: 8px 14px; color: #e0e0e0; font-size: 13px; }
             QLineEdit#inputField:focus { border: 1px solid #533483; }
             QLineEdit#inputField:disabled { color: #555555; }
             QPushButton#sendBtn { background-color: #533483; color: white;
@@ -195,8 +187,7 @@ class NuriGUI(QMainWindow):
             QPushButton#sendBtn:hover { background-color: #6a45a0; }
             QPushButton#sendBtn:pressed { background-color: #3d2566; }
             QPushButton#sendBtn:disabled { background-color: #2a1a4a; color: #666; }
-            QPushButton#micBtn { background-color: #0f3460;
-                                 border: 1px solid #533483;
+            QPushButton#micBtn { background-color: #0f3460; border: 1px solid #533483;
                                  border-radius: 8px; font-size: 15px; }
             QPushButton#micBtn:hover { background-color: #1a4a80; }
             QScrollBar:vertical { background: #16213e; width: 6px; border-radius: 3px; }
@@ -251,7 +242,10 @@ class NuriGUI(QMainWindow):
             self.add_message("Tizim", "NURI hali yuklanmoqda, kuting...", "system")
             return
 
-        admin_pass = os.getenv("ADMIN_PASSWORD", "darling")
+        admin_pass = os.getenv("ADMIN_PASSWORD")
+        if not admin_pass:
+            self.add_message("Tizim", "XATO: ADMIN_PASSWORD .env da yo'q!", "system")
+            return
 
         if password == admin_pass:
             self.nuri_core.current_role = "admin"
