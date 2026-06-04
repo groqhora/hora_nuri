@@ -8,7 +8,39 @@ import concurrent.futures
 import aiohttp
 from dotenv import load_dotenv
 
-load_dotenv()
+
+def check_or_create_env():
+    if getattr(sys, 'frozen', False):
+        base = os.path.dirname(sys.executable)
+    else:
+        base = os.path.dirname(os.path.abspath(__file__))
+
+    env_path = os.path.join(base, ".env")
+
+    if not os.path.exists(env_path):
+        print("\n[NURI] .env fayl topilmadi. Sozlash boshlanyapti...\n")
+        groq_key = input("GROQ_API_KEY: ").strip()
+        gemini_key = input("GEMINI_API_KEY (bo'sh qoldirsa bo'ladi): ").strip()
+        telegram_token = input("TELEGRAM_BOT_TOKEN (bo'sh qoldirsa bo'ladi): ").strip()
+        admin_pass = input("ADMIN_PASSWORD (default: darling): ").strip() or "darling"
+
+        with open(env_path, "w") as f:
+            f.write(f"ADMIN_PASSWORD={admin_pass}\n")
+            f.write(f"NURI_INNER_PASSWORD=root\n")
+            f.write(f"GROQ_API_KEY={groq_key}\n")
+            f.write(f"GROQ_API_KEY_1={groq_key}\n")
+            if gemini_key:
+                f.write(f"GEMINI_API_KEY={gemini_key}\n")
+            if telegram_token:
+                f.write(f"TELEGRAM_BOT_TOKEN={telegram_token}\n")
+
+        print("[NURI] .env yaratildi ✅\n")
+        load_dotenv(env_path)
+    else:
+        load_dotenv(env_path)
+
+
+check_or_create_env()
 
 from ai_engine import AIEngine
 from keyboard_module import KeyboardModule
@@ -19,6 +51,7 @@ import memory_module as mm
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 class NURICore:
     def __init__(self):
@@ -32,17 +65,23 @@ class NURICore:
         self.current_role = "stranger"
         self.plugins = {}
         self._load_plugins()
-        self.max_context_tokens = 1500
         print("[NURI.SYSTEM] Tayyor ✅\n")
 
     def _load_plugins(self):
-        base_path = os.path.dirname(sys.executable if getattr(sys, 'frozen', False) else os.path.abspath(__file__))
-        plugins_dir = os.path.join(base_path, "plugins")
+        if getattr(sys, 'frozen', False):
+            base = os.path.dirname(sys.executable)
+        else:
+            base = os.path.dirname(os.path.abspath(__file__))
+
+        plugins_dir = os.path.join(base, "plugins")
         os.makedirs(plugins_dir, exist_ok=True)
+
         for filename in sorted(os.listdir(plugins_dir)):
             if filename.endswith(".py") and not filename.startswith("_"):
                 try:
-                    spec = importlib.util.spec_from_file_location(filename[:-3], os.path.join(plugins_dir, filename))
+                    spec = importlib.util.spec_from_file_location(
+                        filename[:-3], os.path.join(plugins_dir, filename)
+                    )
                     if spec and spec.loader:
                         module = importlib.util.module_from_spec(spec)
                         spec.loader.exec_module(module)
@@ -55,36 +94,50 @@ class NURICore:
         if text and text.strip():
             print(f"\n[NURI]: {text}")
             try:
-                await asyncio.wait_for(asyncio.get_event_loop().run_in_executor(None, ve.text_to_speech, text), timeout=5.0)
+                await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(None, ve.text_to_speech, text),
+                    timeout=5.0
+                )
             except Exception:
                 pass
 
     async def check_apis(self):
-        print("\n" + "="*40 + "\nAPI CHECK\n" + "="*40)
+        print("\n" + "=" * 40 + "\nAPI CHECK\n" + "=" * 40)
         async with aiohttp.ClientSession() as session:
-            for name, url in [("Groq", "https://api.groq.com/openai/v1/models"), ("Gemini", "https://generativelanguage.googleapis.com/v1beta/models")]:
+            for name, url in [
+                ("Groq", "https://api.groq.com/openai/v1/models"),
+                ("Gemini", "https://generativelanguage.googleapis.com/v1beta/models")
+            ]:
                 try:
                     async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as r:
                         print(f"  ✅ {name}" if r.status in (200, 401, 403) else f"  ❌ {name}")
-                except:
+                except Exception:
                     print(f"  ❌ {name}")
-        print("="*40 + "\n")
+        print("=" * 40 + "\n")
 
     async def authenticate_startup(self) -> bool:
-        print("\n" + "="*40 + "\n  NURI\n" + "="*40 + "\n")
+        print("\n" + "=" * 40 + "\n  NURI\n" + "=" * 40 + "\n")
         await self.check_apis()
-        admin_pass = os.getenv("ADMIN_PASSWORD", "darling")
+
+        admin_pass = os.getenv("ADMIN_PASSWORD")
+        if not admin_pass:
+            print("[XATO] ADMIN_PASSWORD .env da yo'q!")
+            return False
+
         while True:
             try:
                 password = getpass.getpass("Parol → ")
             except (KeyboardInterrupt, EOFError):
                 return False
+
             if password == admin_pass:
-                self.current_role, self.current_user = "admin", "admin"
+                self.current_role = "admin"
+                self.current_user = "admin"
                 await self.speak_and_print("Admin sifatida kirdingiz!")
                 return True
             elif ie.verify_user_password(password):
-                self.current_role, self.current_user = "user", ie.get_username_by_password(password) or "user"
+                self.current_role = "user"
+                self.current_user = ie.get_username_by_password(password) or "user"
                 await self.speak_and_print(f"Xush kelibsiz, {self.current_user}!")
                 return True
             else:
@@ -106,12 +159,18 @@ class NURICore:
     async def process_command(self, command: str) -> str:
         if not command or not command.strip():
             return ""
-        cmd, lower = command.strip(), command.strip().lower()
-        
+
+        cmd = command.strip()
+        lower = cmd.lower()
+
         if lower.startswith(("admin:", "user:")):
-            prefix, password = lower.split(":", 1)[0], cmd.split(":", 1)[1].strip()
-            if prefix == "admin" and password == os.getenv("ADMIN_PASSWORD", "darling"):
-                self.current_role, self.current_user = "admin", "admin"
+            prefix = lower.split(":", 1)[0]
+            password = cmd.split(":", 1)[1].strip()
+            admin_pass = os.getenv("ADMIN_PASSWORD")
+
+            if prefix == "admin" and password == admin_pass:
+                self.current_role = "admin"
+                self.current_user = "admin"
                 msg = "Admin sifatida qayta kirdingiz!"
                 mm.save_conversation("admin", cmd, msg)
                 await self.speak_and_print(msg)
@@ -124,28 +183,37 @@ class NURICore:
                 await self.speak_and_print(msg)
                 return msg
             return "Parol xato!"
-        
+
         if self.current_role == "stranger":
             return "Avval parol kiriting!"
-        
+
         if self.current_role == "admin":
             if any(kw in lower for kw in ["status", "holat"]):
                 ai_status = await self.ai.get_status()
-                response = f"NURI STATUS\nFoydalanuvchi: {self.current_user}\nAI Engines: {ai_status['total_engines']}\nPlugins: {len(self.plugins)}"
+                response = (
+                    f"NURI STATUS\n"
+                    f"Foydalanuvchi: {self.current_user}\n"
+                    f"AI Engines: {ai_status['total_engines']}\n"
+                    f"Groq kalitlar: {ai_status['groq_keys']}\n"
+                    f"Gemini: {'✅' if ai_status['gemini_available'] else '❌'}\n"
+                    f"Plugins: {len(self.plugins)}"
+                )
                 mm.save_conversation(self.current_user, cmd, response)
                 await self.speak_and_print(response)
                 return response
+
             if "plugin" in lower and "qayta yukla" in lower:
                 self.plugins.clear()
                 self._load_plugins()
                 await self.speak_and_print("Plugins qayta yuklandi")
                 return "OK"
+
             if "telegram" in lower:
                 return await self._handle_telegram(cmd, lower)
-        
+
         if self.current_role == "user" and any(kw in lower for kw in ["telegram", "parol"]):
-            return "Admin uchun!"
-        
+            return "Bu buyruq faqat admin uchun!"
+
         for plugin_name, plugin in self.plugins.items():
             try:
                 if hasattr(plugin, 'can_handle') and plugin.can_handle(lower):
@@ -158,13 +226,15 @@ class NURICore:
             except Exception as e:
                 logger.error(f"Plugin {plugin_name}: {e}")
                 continue
-        
+
         try:
             history = mm.get_history(self.current_user, limit=5) or ""
             if len(history) > 2000:
                 history = history[-2000:]
             full_prompt = f"{history}\nFoydalanuvchi: {cmd}" if history else cmd
-            ai_response = await asyncio.wait_for(self.ai.generate_response(full_prompt), timeout=35.0)
+            ai_response = await asyncio.wait_for(
+                self.ai.generate_response(full_prompt), timeout=35.0
+            )
             result = ai_response if ai_response else "Bo'sh javob"
             mm.save_conversation(self.current_user, cmd, result)
             await self.speak_and_print(result)
@@ -183,11 +253,11 @@ class NURICore:
             return "Telegram moduli faol emas."
         try:
             if "xabar yubor" in lower:
-                after_parts = cmd.lower().split("xabar yubor", 1)
-                if len(after_parts) < 2:
+                after = cmd.lower().split("xabar yubor", 1)
+                if len(after) < 2:
                     return "Format: telegram xabar yubor @chat ga Xabar"
-                ga_parts = after_parts[1].strip().split(" ga ", 1)
-                if len(ga_parts) != 2 or not ga_parts[0].strip() or not ga_parts[1].strip():
+                ga_parts = after[1].strip().split(" ga ", 1)
+                if len(ga_parts) != 2:
                     return "Format: telegram xabar yubor @chat ga Xabar"
                 chat, message = ga_parts
                 try:
@@ -207,6 +277,7 @@ class NURICore:
                 response = "Scroll qilindi."
             else:
                 response = "Telegram: xabar yubor | chat och | o'qi | scroll"
+
             mm.save_conversation(self.current_user, cmd, response)
             return response
         except Exception as e:
@@ -216,8 +287,10 @@ class NURICore:
     async def start_loop(self):
         if self.telegram.is_active:
             asyncio.create_task(self.telegram.start_listening())
+
         await self.speak_and_print("NURI tayyor!")
-        print("\n" + "="*40 + "\nBUYRUQLAR\nstatus, plugin qayta yukla, chiqish\n" + "="*40 + "\n")
+        print("\n" + "=" * 40 + "\nBUYRUQLAR: status, plugin qayta yukla, chiqish\n" + "=" * 40 + "\n")
+
         loop = asyncio.get_event_loop()
         while True:
             try:
@@ -232,10 +305,12 @@ class NURICore:
                 logger.error(f"Loop: {e}")
                 await asyncio.sleep(1)
 
+
 async def main():
     nuri = NURICore()
     if await nuri.authenticate_startup():
         await nuri.start_loop()
+
 
 if __name__ == "__main__":
     try:
