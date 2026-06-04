@@ -10,7 +10,7 @@ try:
     from groq import Groq
     from dotenv import load_dotenv
     load_dotenv()
-    GROQ_KEY = os.getenv("GROQ_API_KEY_1")
+    GROQ_KEY = os.getenv("GROQ_API_KEY_1") or os.getenv("GROQ_API_KEY")
     groq_client = Groq(api_key=GROQ_KEY) if GROQ_KEY else None
     GROQ_AVAILABLE = bool(groq_client)
 except Exception:
@@ -18,11 +18,11 @@ except Exception:
     groq_client = None
 
 NEWS_SOURCES = {
-    "dunyo":      "https://feeds.bbcnews.com/rss/world",
-    "texnologiya":"https://feeds.feedburner.com/TechCrunch",
-    "o'zbekiston":"https://kun.uz/rss",
-    "sport":      "https://feeds.bbcnews.com/rss/sport",
-    "iqtisodiyot":"https://feeds.bbcnews.com/rss/business",
+    "dunyo":       "https://feeds.bbcnews.com/rss/world",
+    "texnologiya": "https://feeds.feedburner.com/TechCrunch",
+    "o'zbekiston": "https://kun.uz/rss",
+    "sport":       "https://feeds.bbcnews.com/rss/sport",
+    "iqtisodiyot": "https://feeds.bbcnews.com/rss/business",
 }
 
 def can_handle(text: str) -> bool:
@@ -30,7 +30,7 @@ def can_handle(text: str) -> bool:
 
 def get_news(topic: str = "dunyo", limit: int = 5) -> str:
     if not FEEDPARSER_AVAILABLE:
-        return "feedparser o'rnatilmagan. pip install feedparser"
+        return "feedparser o'rnatilmagan."
     url = NEWS_SOURCES.get(topic.lower(), NEWS_SOURCES["dunyo"])
     try:
         feed = feedparser.parse(url)
@@ -55,5 +55,4 @@ def process_command(text: str) -> str:
         return get_news("iqtisodiyot")
     elif "o'zbekiston" in lower or "uzbekiston" in lower:
         return get_news("o'zbekiston")
-    else:
-        return get_news("dunyo")
+    return get_news("dunyo")
