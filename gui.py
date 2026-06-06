@@ -4,11 +4,11 @@ import asyncio
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QHBoxLayout, QLabel,
-    QLineEdit, QPushButton, QTextEdit, QFrame
+    QLineEdit, QPushButton, QTextEdit, QFrame, QInputDialog, QMessageBox
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QTextCursor
-from dotenv import load_dotenv
+from dotenv import load_dotenv, set_key
 load_dotenv()
 
 
@@ -58,14 +58,58 @@ class NuriGUI(QMainWindow):
         self.loader        = None
         self.setup_ui()
         self.setup_style()
-        self.start_loading()
+        
+        # Birinchi navbatda API kalitlarni tekshiramiz
+        self.check_api_keys()
+
+    def check_api_keys(self):
+        """ .env faylida Groq API kaliti borligini tekshiradi """
+        groq_key = os.getenv("GROQ_API_KEY")
+        # Agar kalit bo'lmasa yoki standart yozuv tursa, foydalanuvchidan so'raymiz
+        if not groq_key or groq_key == "YOUR_GROQ_KEY_HERE" or groq_key.strip() == "":
+            self.prompt_api_key()
+        else:
+            self.start_loading()
+
+    def prompt_api_key(self):
+        """ Grafik oynada API kalitni so'rash """
+        text, ok = QInputDialog.getText(
+            self, 'API Sozlamalari', 
+            'Groq API kaliti topilmadi!\nIltimos, faollashtirish uchun GROQ_API_KEY kiriting:',
+            QLineEdit.Password
+        )
+        if ok and text.strip():
+            # .env fayliga kalitni yozamiz
+            if getattr(sys, 'frozen', False):
+                base = os.path.dirname(sys.executable)
+            else:
+                base = os.path.dirname(os.path.abspath(__file__))
+            
+            env_path = os.path.join(base, ".env")
+            
+            # Agar fayl hali yaratilmagan bo'lsa, main.py dagi check_or_create_env funksiyasini chaqiramiz
+            from main import check_or_create_env
+            check_or_create_env()
+            
+            # Kalitlarni .env ga xavfsiz saqlash
+            set_key(env_path, "GROQ_API_KEY", text.strip())
+            set_key(env_path, "GROQ_API_KEY_1", text.strip())
+            
+            # Qayta yuklab olamiz o'zgarishlarni
+            load_dotenv(env_path, override=True)
+            
+            QMessageBox.information(self, "Muvaffaqiyatli", "API Kalit saqlandi! Tizim yuklanmoqda...")
+            self.start_loading()
+        else:
+            QMessageBox.warning(self, "Ogohlantirish", "Dastur API kalitsiz ishlay olmaydi. Yopilmoqda.")
+            sys.exit()
 
     def start_loading(self):
+        self.status_label.setText("Yuklanmoqda...")
         self.loader = NuriLoader()
         self.loader.finished.connect(self._on_loaded)
         self.loader.error.connect(self._on_load_error)
         self.loader.start()
-
     def _on_loaded(self, core):
         self.nuri_core = core
         self.status_label.setText("● Tayyor — Parol kiriting")
