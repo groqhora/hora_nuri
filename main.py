@@ -15,7 +15,8 @@ def check_or_create_env():
 
     env_path = os.path.join(base, ".env")
 
-    # GUI rejimida input() ishlatmaymiz! Shunchaki standart .env yaratamiz.
+    # GUI rejimida input() mutlaqo ishlatilmaydi! 
+    # Agar fayl bo'lmasa, shunchaki standart namuna yaratiladi.
     if not os.path.exists(env_path):
         with open(env_path, "w") as f:
             f.write("ADMIN_PASSWORD=darling\n")
@@ -26,7 +27,7 @@ def check_or_create_env():
     
     load_dotenv(env_path)
 
-# Dastur yuklanishidan oldin .env ni xavfsiz yuklaymiz
+# Dastur import bo'lishi bilanoq .env xavfsiz yuklanadi
 check_or_create_env()
 
 from ai_engine import AIEngine
@@ -39,6 +40,7 @@ import memory_module as mm
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class NURICore:
     def __init__(self):
         print("\n[NURI.SYSTEM] Ishga tushmoqda...")
@@ -47,20 +49,10 @@ class NURICore:
         self.ai = AIEngine()
         self.keyboard = KeyboardModule()
         self.telegram = TelegramModule(core_processor=self._process_command_sync)
-        
-        # Grafik interfeys orqali kirguncha "stranger" holatida bo'ladi
         self.current_user = "stranger"
         self.current_role = "stranger"
         self.plugins = {}
         self._load_plugins()
-        
-        # Telegram modulini avtomatik orqa fonda yoqish (agar faol bo'lsa)
-        if self.telegram.is_active:
-            try:
-                asyncio.get_event_loop().create_task(self.telegram.start_listening())
-            except Exception as e:
-                logger.error(f"Telegram start error: {e}")
-                
         print("[NURI.SYSTEM] Tayyor ✅\n")
 
     def _load_plugins(self):
@@ -116,7 +108,6 @@ class NURICore:
         cmd = command.strip()
         lower = cmd.lower()
 
-        # [Diqqat] GUI uchun autentifikatsiya mantiqini saqlab qolamiz (agar kimdir matn orqali kirmoqchi bo'lsa)
         if lower.startswith(("admin:", "user:")):
             prefix = lower.split(":", 1)[0]
             password = cmd.split(":", 1)[1].strip()
@@ -125,11 +116,17 @@ class NURICore:
             if prefix == "admin" and password == admin_pass:
                 self.current_role = "admin"
                 self.current_user = "admin"
-                return "Admin sifatida qayta kirdingiz!"
+                msg = "Admin sifatida qayta kirdingiz!"
+                mm.save_conversation("admin", cmd, msg)
+                await self.speak_and_print(msg)
+                return msg
             elif prefix == "user" and ie.verify_user_password(password):
                 self.current_user = ie.get_username_by_password(password) or "user"
                 self.current_role = "user"
-                return f"User sifatida kirdingiz ({self.current_user})!"
+                msg = f"User sifatida kirdingiz ({self.current_user})!"
+                mm.save_conversation(self.current_user, cmd, msg)
+                await self.speak_and_print(msg)
+                return msg
             return "Parol xato!"
 
         if self.current_role == "stranger":
@@ -146,14 +143,16 @@ class NURICore:
                     f"Gemini: {'✅' if ai_status['gemini_available'] else '❌'}\n"
                     f"Plugins: {len(self.plugins)}"
                 )
+                mm.save_conversation(self.current_user, cmd, response)
+                await self.speak_and_print(response)
                 return response
 
             if "plugin" in lower and "qayta yukla" in lower:
                 self.plugins.clear()
                 self._load_plugins()
-                return "Plugins qayta yuklandi"
+                await self.speak_and_print("Plugins qayta yuklandi")
+                return "OK"
 
-        # Sokin holatda AI response generation qismi
         try:
             history = mm.get_history(self.current_user, limit=5) or ""
             if len(history) > 2000:
@@ -165,12 +164,10 @@ class NURICore:
             result = ai_response if ai_response else "Bo'sh javob"
             mm.save_conversation(self.current_user, cmd, result)
             
-            # Ovozli o'qishni GUI-ni muzlatib qo'ymaslik uchun async chaqiramiz
+            # Ovoz interfeysni qotirmasligi uchun async fonda chaqiriladi
             asyncio.create_task(self.speak_and_print(result))
             return result
         except Exception as e:
-            return f"AI xatosi: {str(e)[:80]}"
-
-# Agar main.py konsoldan alohida test qilinsagina ishlaydi, GUI ga xalaqit bermaydi
-if __name__ == "__main__":
-    print("NURI Core faqat modul sifatida GUI tomonidan chaqirilishi tavsiya etiladi.")
+            msg = f"AI xatosi: {str(e)[:80]}"
+            mm.save_conversation(self.current_user, cmd, msg)
+            return msg
